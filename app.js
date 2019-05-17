@@ -5,9 +5,12 @@ mongoose = require("mongoose"),
 expressSanitizer = require("express-sanitizer");
 app = express();
 
+var stripe = require("stripe")('sk_test_ocLNJdBTBpiR9pZKoOXEtvqe');
+
+
 
 //App config
-mongoose.connect("mongodb://localhost:27017/blog_app", { useNewUrlParser: true });
+mongoose.connect("mongodb://localhost:27017/Zone", { useNewUrlParser: true });
 app.set("view engine", "ejs");
 app.use(express.static("public"));
 app.use(bodyParser.urlencoded({extended: true}));
@@ -22,6 +25,25 @@ var blogSchema = new mongoose.Schema({
 	created: {type: Date, default: Date.now}
 });
 var Blog = mongoose.model("Blog", blogSchema);
+
+var packageSchema = new mongoose.Schema({
+  name: {
+    type: String
+    },
+  price: {
+    type: Number
+    },
+  expireInDays: {
+    type: Number
+    },
+  numClasses: {
+    type: Number
+    },
+},
+{
+  timestamp: true
+})
+var Package = mongoose.model("Package",packageSchema);
 
 //RESTful routes
 
@@ -106,6 +128,36 @@ app.delete("/blogs/:id",function(req,res) {
 	})
 })
 
+
+app.get("/stripe", function(req,res){
+    res.render("stripe");
+  
+})
+
+app.get('/stripe/package/checkout', (req,res) =>{
+  Package.findOne({ _id: req.body.package_id } , (error, package) =>{
+      if(error) res.status(400).json(error)
+      if(package){
+        stripe.orders.create({
+          currency: 'mxn',
+          customer: req.body.user_id,
+          items: [
+            {
+              type: 'sku',
+              parent: package._id + package.updatedAt
+            }
+          ]
+        }, (order, err) =>{
+          if(err) res.status(400).json(err)
+          res.status(200).json(order);
+        })
+
+      } else {
+        res.status(400).json({ message: "No se encontro el paquete"})
+      }
+      
+    })
+})
 
 app.listen("3000",function() {
 	console.log("Blog App running on port 3000");
